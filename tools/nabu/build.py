@@ -3,7 +3,7 @@
 -SO2: -SO3 miscompiles, as on the Adam). No make needed; build-nabu.bat runs
 this.
 
-    python tools/nabu/build.py                 r2r/nabu/barrage.nabu (+ its menu)
+    python tools/nabu/build.py                 r2r/nabu/fujinet-barrage.nabu
     python tools/nabu/build.py clean
     SERVER=host:port                           the rooms listed (gen/config.h; default fujinet.online:9913)
     TEST_SCENE=n TEST_ARG=a                    a scene built in (src/test.c)
@@ -180,12 +180,12 @@ def main():
         if os.path.getsize(outs[prog]) > 60401:
             sys.exit("build.py: over the 60401 bytes a .nabu can be")
     os.makedirs(R, exist_ok=True)
-    out = os.path.join(R, "barrage.nabu")
+    out = os.path.join(R, "fujinet-barrage.nabu")
     shutil.copyfile(outs["barrage"], out)
     print("Built " + out)
     local = os.environ.get("LOCAL_DIR", r"c:\nabu\local")
     if os.path.isdir(local):
-        shutil.copyfile(out, os.path.join(local, "barrage.nabu"))
+        shutil.copyfile(out, os.path.join(local, "fujinet-barrage.nabu"))
         print("Copied to " + local)
 
 

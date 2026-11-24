@@ -64,10 +64,6 @@ void title(void)
 {
 #ifdef SCR_PICTURE
     scr_picture();
-#ifdef __NABU__
-    scr_row(0, PAL_TEXT);               /* (the picture's top row, the border's blue: the hint) */
-    centre(0, QUIT_HINT);
-#endif
 #else
     uint8_t r;
     scr_begin();
@@ -84,7 +80,7 @@ void title(void)
     snd_tune(t_title1, t_title2);       /* (it plays on through the menus) */
     do {
         tick();
-#ifdef QUIT_HINT                         /* (a platform that can quit: its title says so) */
+#ifdef QUIT_HINT                         /* (a platform that can quit: ESC on the title) */
         if (ev_key == KEY_ESC)
             plat_quit();
 #endif
