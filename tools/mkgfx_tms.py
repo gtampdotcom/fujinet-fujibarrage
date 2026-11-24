@@ -118,20 +118,25 @@ TMS = [(0, 0, 0), (0, 0, 0), (33, 200, 66), (94, 220, 120), (84, 85, 237), (125,
  MAGENTA, GREY, WHITE) = range(1, 16)
 
 
-def title_canvas():
+def title_canvas(nabu=False):
     sys.path.insert(0, HERE)
     import mktitle_coco as mt
     W, H = 256, 192
-    cv = mt.Canvas(W, H, DBLUE)
+    # C(index, rgb): the NABU's canvas holds both, the TMS9918A's colour and
+    # the VGA build's (tools/msdos/mktitle_dos.py) there: f18a_table's
+    C = (lambda i, rgb: (i, rgb)) if nabu else (lambda i, rgb: i)
+    V = VGA
+    cv = mt.Canvas(W, H, C(DBLUE, V["sky"][0]))
     f = mt.font3()
     b3 = lambda ch: mt.glyph_bits3(f, ch)
     # the sky: night to dusk to fire, in bands
     bands = [(DBLUE, MAGENTA, 0, 48), (MAGENTA, MRED, 48, 90), (MRED, LRED, 90, 120), (LRED, DYELLOW, 120, 144)]
     for a, b, y0, y1 in bands:
         for y in range(y0, y1):
-            cv.rect(0, y, W, y + 1, a if (y - y0) * 2 < (y1 - y0) else b)   # (bands: no dither)
+            split = 38 if nabu and y0 == 0 else (y0 + y1) // 2      # (the NABU's logo all on the night's blue)
+            cv.rect(0, y, W, y + 1, C(a if y < split else b, V["sky"][min(79, y * 80 // 144)]))   # (bands: no dither)
     rnd = random.Random(7)
-    for _ in range(32):
+    for _ in range(0 if nabu else 32):     # (the NABU's: no stars)
         x, y = rnd.randrange(W), rnd.randrange(44)
         cv.set(x, y, WHITE if rnd.random() < 0.3 else GREY)
     # the sun, banded
@@ -141,47 +146,137 @@ def title_canvas():
             continue
         for x in range(sx - 40, sx + 41):
             if ((x - sx) * PAR / 64) ** 2 + (y - sy) ** 2 <= sr * sr:
-                cv.set(x, y, LYELLOW if y < sy - 12 else DYELLOW)
+                cv.set(x, y, C(LYELLOW if y < sy - 12 else DYELLOW, V["sun"][min(11, (y - (sy - sr)) * 12 // sr)]))
     far = mt.hills(W, 134, 12, 0.039, 0.096, 1.3)
     for x in range(W):
         for y in range(far[x], H):
-            cv.set(x, y, DRED)
+            cv.set(x, y, C(DRED, V["far"][min(11, (y - far[x]) * 12 // 40)]))
     near = mt.hills(W, 154, 10, 0.025, 0.062, 0.4)
     for x in range(W):
         for y in range(near[x], H):
             d = y - near[x]
+            lv = max(0, min(27, (y - 144) * 28 // 48))
             if d < 2:
-                c = MGREEN
+                c = C(MGREEN, V["rim"])
             else:
-                c = DGREEN if y > 166 else MGREEN
+                c = C(DGREEN if y > 166 else MGREEN, V["near"][lv])
                 if (y // 6) % 3 == 0 and d > 6:
-                    c = DRED
+                    c = C(DRED, V["near"][min(27, lv + 3)])
             cv.set(x, y, c)
     rows = ["....SSSS....", "...SSHHSS...", ".SSSSSSSSSS.", "SSSSSSSSSSSS", "KSKSKSKSKSKS", ".KKKKKKKKKK."]
     lx, rx = 50, 210
-    mt.tank(cv, lx, near[lx] + 1, rows, {"S": MRED, "K": BLACK, "H": WHITE}, 2, 2, 52, PAR, 9, 2, MRED)
-    mt.tank(cv, rx, near[rx] + 1, rows, {"S": LBLUE, "K": BLACK, "H": WHITE}, 2, 2, 150, PAR, 9, 2, LBLUE)
+    red, blue, k = C(MRED, V["red"][0]), C(LBLUE, V["blue"][0]), C(BLACK, (0, 0, 0))
+    mt.tank(cv, lx, near[lx] + 1, rows, {"S": red, "K": k, "H": C(WHITE, V["red"][2])}, 2, 2, 52, PAR, 9, 2, red)
+    mt.tank(cv, rx, near[rx] + 1, rows, {"S": blue, "K": k, "H": C(WHITE, V["blue"][2])}, 2, 2, 150, PAR, 9, 2, blue)
     pts = mt.arc(lx + 10, near[lx] - 18, rx - 28, near[rx - 28] - 2, 80, 50)
     for k, (x, y) in enumerate(pts[:-3]):
         if k % 2 == 0:
-            cv.set(int(x), int(y), WHITE)
-            cv.set(int(x) + 1, int(y), LYELLOW)
+            cv.set(int(x), int(y), C(WHITE, V["white"]))
+            cv.set(int(x) + 1, int(y), C(LYELLOW, V["burst"][1]))
     bx, by = int(pts[-1][0]), int(pts[-1][1])
-    mt.burst(cv, bx, by, 11, PAR, [(0.3, WHITE), (0.55, LYELLOW), (0.75, DYELLOW), (1.01, LRED)])
+    mt.burst(cv, bx, by, 11, PAR, [(0.3, C(WHITE, V["burst"][0])), (0.55, C(LYELLOW, V["burst"][1])),
+                                   (0.75, C(DYELLOW, V["burst"][2])), (1.01, C(LRED, V["burst"][3]))])
     s = "FUJIBARRAGE"
     wl = len(s) * 8 * 2 + 0
     grad = [WHITE, LYELLOW, LYELLOW, LYELLOW, DYELLOW, DYELLOW, DYELLOW, LRED, LRED, MRED, MRED, DRED, DRED]
-    mt.logo(cv, b3, s, (W - wl) // 2 - 2, 10, 2, 3, 8,
-            lambda x, y: grad[min(len(grad) - 1, y * len(grad) // 24)], BLACK, DBLUE)
     tag = "AIM, FIRE, TALK TRASH."
     tw = len(tag) * 8
-    mt.text(cv, b3, tag, (W - tw) // 2 + 1, 43, BLACK)
-    mt.text(cv, b3, tag, (W - tw) // 2, 42, WHITE)
+    if nabu:        # the NABU's: two colours a run (the letters and the sky), no outline or shadow to clash
+        m = mt.mask_text(wl, 24, b3, s, 2, 3, 8)
+        x0 = (W - wl) // 2
+        for y in range(24):
+            for x in range(wl):
+                if m.px[y][x]:
+                    cv.set(x0 + x, 10 + y, C(grad[min(len(grad) - 1, y * len(grad) // 24)], V["logo"][y * 16 // 24]))
+        mt.text(cv, b3, tag, (W - tw) // 2, 42, C(WHITE, V["white"]))
+    else:
+        mt.logo(cv, b3, s, (W - wl) // 2 - 2, 10, 2, 3, 8,
+                lambda x, y: grad[min(len(grad) - 1, y * len(grad) // 24)], BLACK, DBLUE)
+        mt.text(cv, b3, tag, (W - tw) // 2 + 1, 43, BLACK)
+        mt.text(cv, b3, tag, (W - tw) // 2, 42, WHITE)
     pf = "PRESS FIRE"
     pw = len(pf) * 8
-    cv.rect((W - pw) // 2 - 4, 176, (W + pw) // 2 + 4, 188, BLACK)
-    mt.text(cv, b3, pf, (W - pw) // 2, 178, LYELLOW)
+    cv.rect((W - pw) // 2 - 4, 176, (W + pw) // 2 + 4, 188, C(BLACK, (0, 0, 0)))
+    mt.text(cv, b3, pf, (W - pw) // 2, 178, C(LYELLOW, V["yellow"]))
     return cv
+
+
+def _ramp(stops, n):
+    out = []
+    for i in range(n):
+        t = i / (n - 1)
+        for (t0, c0), (t1, c1) in zip(stops, stops[1:]):
+            if t0 <= t <= t1:
+                out.append(tuple(c0[k] + (c1[k] - c0[k]) * (t - t0) / (t1 - t0) for k in range(3)))
+                break
+    return out
+
+
+# the VGA build's title colours (tools/msdos/mktitle_dos.py title_vga)
+VGA = {
+    "sky": _ramp([(0, (6, 8, 36)), (0.45, (60, 24, 96)), (0.75, (190, 60, 90)), (1, (255, 140, 50))], 80),
+    "sun": _ramp([(0, (255, 252, 190)), (1, (255, 150, 40))], 12),
+    "far": _ramp([(0, (60, 26, 70)), (1, (30, 12, 40))], 12),
+    "near": _ramp([(0, (120, 112, 34)), (0.3, (92, 70, 24)), (1, (34, 24, 10))], 28),
+    "rim": (170, 160, 60),
+    "red": [(230, 40, 30), (150, 20, 16), (255, 200, 190)],
+    "blue": [(60, 120, 255), (30, 60, 160), (210, 230, 255)],
+    "logo": _ramp([(0, (255, 255, 200)), (0.35, (255, 220, 60)), (0.7, (255, 110, 20)), (1, (170, 20, 10))], 16),
+    "burst": [(255, 255, 255), (255, 250, 170), (255, 200, 60), (255, 120, 20), (200, 40, 10)],
+    "white": (255, 255, 255), "yellow": (255, 230, 80),
+}
+
+# the F18A's palette at power-on, its first 16 (src/nabu/f18a.c tms_pal)
+TMS12 = [0x000, 0x000, 0x2C3, 0x5D6, 0x54F, 0x76F, 0xD54, 0x4EF,
+         0xF54, 0xF76, 0xDC3, 0xED6, 0x2B2, 0xC5C, 0xCCC, 0xFFF]
+F18A_PAIRS, F18A_WRITES = 96, 4
+
+
+def f18a_shown(pat, col, x, y):
+    at = (y >> 3) * 256 + (x >> 3) * 8 + (y & 7)
+    return col[at] >> 4 if pat[at] & (0x80 >> (x & 7)) else col[at] & 15
+
+
+def f18a_table(pat, col, rgb):
+    """the title's copper table (tools/nabu/mkcopper.py, src/nabu/f18a.c
+    f18a_title): for each pair of lines 4 words, entry << 12 | 0RGB, the
+    tiles' entries (16-31) the pair's pixels show set to the VGA build's
+    colours there (their mean), written while the line before is drawn;
+    the entries a pair doesn't show keep what they had. Also the palette
+    each pair is drawn with (a preview's)."""
+    want = []
+    for k in range(F18A_PAIRS):
+        acc = {}
+        for y in (2 * k, 2 * k + 1):
+            for x in range(256):
+                a = acc.setdefault(f18a_shown(pat, col, x, y), [0, 0, 0, 0])
+                for j in range(3):
+                    a[j] += rgb[y][x][j]
+                a[3] += 1
+        w = {}
+        for i, a in acc.items():
+            r, g, b = (round(a[j] / a[3] * 15 / 255) for j in range(3))
+            w[i] = (r << 8 | g << 4 | b, a[3])
+        want.append(w)
+    state = list(TMS12)
+    late = 0
+    for lap in range(3):            # (round the frame till it settles: pair 0 follows pair 95)
+        out, late, shown = [], 0, []
+        for w in want:
+            need = sorted(((n, i, v) for i, (v, n) in w.items() if state[i] != v), reverse=True)
+            late += max(0, len(need) - F18A_WRITES)
+            ws = []
+            for n, i, v in need[:F18A_WRITES]:
+                state[i] = v
+                ws.append(i << 12 | v)
+            while len(ws) < F18A_WRITES:
+                ws.append(state[0])         # (entry 0, as it is: no tile shows it)
+            out += ws
+            shown.append(list(state))
+    data = bytearray()
+    for v in out:
+        data += bytes((v >> 8, v & 0xFF))
+    return bytes(data), late, shown
 
 
 def dist(a, b):
@@ -212,15 +307,27 @@ def tables(cv):
     return pat, col
 
 
-def title(path, preview=None):
+def title(path, preview=None, nabu=False):
     sys.path.insert(0, HERE)
     import mktitle_coco as mt
-    cv = title_canvas()
+    cv = title_canvas(nabu)
+    rgb = None
+    if nabu:
+        rgb = [[c[1] for c in row] for row in cv.px]
+        for row in cv.px:
+            row[:] = [c[0] for c in row]
     pat, col = tables(cv)
     for stream in (pat, col):
         assert mt.lz_unpack(mt.lz_pack(stream)) == bytes(stream)
     lines = ["        SECTION rodata_user", "        PUBLIC  _title_pat, _title_col", "_title_pat:"] + \
         rows(mt.lz_pack(pat)) + ["_title_col:"] + rows(mt.lz_pack(col))
+    shown = None
+    if nabu:                        # the F18A's colours for it (f18a.c f18a_title)
+        ft, late, shown = f18a_table(pat, col, rgb)
+        pk = mt.lz_pack(ft)
+        assert mt.lz_unpack(pk) == ft
+        print("title: the F18A's table %d bytes, %d packed (%d writes late)" % (len(ft), len(pk), late))
+        lines += ["        PUBLIC  _title_f18a", "_title_f18a:"] + rows(pk)
     emit(path, lines)
     if preview:
         from PIL import Image
@@ -231,6 +338,14 @@ def title(path, preview=None):
                 c = col[at] >> 4 if pat[at] & (0x80 >> (x & 7)) else col[at] & 15
                 im.putpixel((x, y), TMS[c])
         im.resize((768, 576), Image.NEAREST).save(preview)
+        if shown:                   # and as the F18A shows it
+            im = Image.new("RGB", (256, 192))
+            for y in range(192):
+                pal = shown[y // 2]
+                for x in range(256):
+                    v = pal[f18a_shown(pat, col, x, y)]
+                    im.putpixel((x, y), ((v >> 8) * 17, (v >> 4 & 15) * 17, (v & 15) * 17))
+            im.resize((768, 576), Image.NEAREST).save(preview[:-4] + "_f18a.png")
 
 
 def main():
@@ -243,8 +358,8 @@ def main():
         field(out)
     elif what == "art":
         art(out)
-    elif what == "title":
-        title(out, sys.argv[3] if len(sys.argv) > 3 else None)
+    elif what in ("title", "title-nabu"):
+        title(out, sys.argv[3] if len(sys.argv) > 3 else None, what == "title-nabu")
     else:
         sys.exit("mkgfx_tms.py: what is %s?" % what)
 

@@ -66,7 +66,7 @@ def gen():
     tasks = [
         ("fldart.asm", ["tools/mkgfx_tms.py", "field"]),
         ("art.bin", ["tools/mkgfx_tms.py", "art"]),
-        ("title.asm", ["tools/mkgfx_tms.py", "title"]),
+        ("title.asm", ["tools/mkgfx_tms.py", "title-nabu"]),   # (clean letters, no stars)
         ("sfx.asm", ["tools/mksfx_z80.py", "sfx"]),
         ("copper.h", ["tools/nabu/mkcopper.py"]),
         ("tunes.asm", ["tools/mksfx_z80.py", "tunes", None, "title=music/title.txt",

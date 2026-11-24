@@ -43,6 +43,8 @@ extern uint8_t f18a;
 void f18a_detect(void);
 void f18a_start(void);
 void f18a_quit(void);
+void f18a_title(void);          /* menus.c title(): its VGA colours, and after */
+void f18a_title_end(void);
 
 /* the sound's frame (irq.asm calls it; src/sound/) */
 void snd_nmi(void);

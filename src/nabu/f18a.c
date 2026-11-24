@@ -22,6 +22,9 @@
  * written, so a reset (no quitting on the NABU) leaves whatever runs next
  * its colours (the F18A's palette outlives a reset; VR24 doesn't).
  *
+ * The title (menus.c) has the VGA build's colours too (f18a_title): the
+ * copper's second part, tools/mkgfx_tms.py's table of them.
+ *
  * The F18A is unlocked once (f18a_detect) and not locked again till we
  * quit (f18a_quit: a write to VR57 then would turn things off).
  */
@@ -170,6 +173,7 @@ void f18a_start(void)
     cp.phase = cp.on = 0;
     vram_put(COPPER_TAB, &cp, sizeof(cp));
     vram_put(COPPER_ORG, copper, sizeof(copper));
+    vram_put(COPPER_TITLE_ORG, copper_title, sizeof(copper_title));
     f_palette(16);              /* the tiles' 16: the TMS9918A's, copied */
     vdp_reg(24, 0x01);          /* (VR24: tiles from entries 16-31) */
     ao_lim = 11;                /* (ten tanks: never one in the bitmap) */
@@ -218,6 +222,49 @@ void f18a_look(uint8_t sky, uint8_t pal)
     vram_put(COPPER_TAB, &cp, sizeof(cp));
     vdp_reg(54, COPPER_ORG >> 8);
     vdp_reg(55, COPPER_ORG & 0xFF);     /* the copper (re)started */
+}
+
+/* menus.c's title, drawn (scr_picture): the VGA build's colours on it, the
+ * copper setting the tiles' entries a pair of lines at a time from its
+ * table (gen/nabu/title.asm: tools/mkgfx_tms.py f18a_table, packed), put
+ * where the shake's names are (VRAM 1C00h: f18a_title_end puts them back).
+ * The table is unpacked into the field's store (free till a room, as
+ * title.asm has it). */
+extern const uint8_t title_f18a[];
+extern const uint8_t *lz_src;
+extern uint8_t *lz_dst;
+void lz_unpack(void);
+#define T_BUF ((uint8_t *)0xD000)       /* (tools/nabu/build.py SHADOW_ORG) */
+#define T_LEN 768
+
+void f18a_title(void)
+{
+    if (!f18a)
+        return;
+    lz_src = title_f18a;
+    lz_dst = T_BUF;
+    lz_unpack();
+    vram_put(COPPER_TITLE_TAB, T_BUF, T_LEN);
+    vdp_r7 = C_BLACK;                   /* the border black (entry 4's the sky's here: the */
+    vdp_reg(7, C_BLACK);                /* next screen's scr_begin sets its own) */
+    cp.on = 2;
+    vram_put(COPPER_TAB + CP_ON, &cp.on, 1);
+    vdp_reg(54, COPPER_ORG >> 8);
+    vdp_reg(55, COPPER_ORG & 0xFF);     /* the copper (re)started */
+}
+
+/* the title left: the copper stopped, the TMS9918A's colours, the shake's
+ * names (scr.asm's: the field's rows a cell left, the HUD's not) */
+void f18a_title_end(void)
+{
+    uint8_t r, c, *p = T_BUF;
+    if (!f18a)
+        return;
+    f18a_off();
+    for (r = 0; r < 24; ++r)
+        for (c = 0; c < 32; ++c)
+            *p++ = (uint8_t)(((c + (r < 21)) & 31) | (r & 7) << 5);
+    vram_put(0x1C00, T_BUF, T_LEN);
 }
 
 /* field.asm's field_off: a text screen comes */

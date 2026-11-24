@@ -60,10 +60,18 @@ void message(const char *a, const char *b, uint8_t frames)
 #if defined(MENU) || defined(ONE_PROGRAM)
 /* ---- the menu program's (MENU.COM): the title, the name, the room ---- */
 
+#ifdef __NABU__
+void f18a_title(void);                  /* src/nabu/f18a.c: on an F18A, the VGA build's colours */
+void f18a_title_end(void);
+#endif
+
 void title(void)
 {
 #ifdef SCR_PICTURE
     scr_picture();
+#ifdef __NABU__
+    f18a_title();
+#endif
 #else
     uint8_t r;
     scr_begin();
@@ -85,6 +93,9 @@ void title(void)
             plat_quit();
 #endif
     } while (!ev_btn && ev_key == KEY_NONE);
+#ifdef __NABU__
+    f18a_title_end();
+#endif
     snd_cue(UI_GO, 0);
 }
 
