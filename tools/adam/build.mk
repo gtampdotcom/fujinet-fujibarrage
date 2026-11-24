@@ -72,7 +72,7 @@ $(B)/$(1)/%.o: %.c $(HDRS) $(B)/$(1).flags
 	$(ZCC) $$(CFLAGS) $$($(1)_FLAGS) -c -o $$@ $$<
 $(B)/$(1)/%.o: %.asm $(B)/$(1).flags $(GEN) $(wildcard src/z80/*.inc src/adam/*.inc)
 	@mkdir -p $$(dir $$@)
-	$(ZCC) $$(CFLAGS) $$($(1)_FLAGS) -Ca-Isrc/z80 -Ca-Isrc -c -o $$@ $$<
+	$(ZCC) $$(CFLAGS) $$($(1)_FLAGS) -Ca-Isrc/z80 -Ca-Isrc/adam -Ca-Isrc -c -o $$@ $$<
 $(B)/$(1).ddp: $$($(1)_OBJ) $(FNLIB)/fujinet-adam.lib
 	$(ZCC) $$(LDFLAGS) -o $(B)/$(1).bin $$($(1)_OBJ) -L$(FNLIB) -lfujinet-adam
 	rm -f $(B)/$(1)_BOOTSTRAP.bin

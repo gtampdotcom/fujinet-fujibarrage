@@ -115,7 +115,7 @@ static void ground(void)
 #endif
 }
 
-#if defined(_COCO_BASIC_) || defined(__ADAM__) || defined(__MSDOS__)
+#if defined(_COCO_BASIC_) || defined(__ADAM__) || defined(__MSDOS__) || defined(__NABU__)
 static uint8_t show;                    /* scene 8's extras */
 #endif
 
@@ -124,7 +124,7 @@ static void field_scene(uint8_t shots, uint8_t stream_only)
     uint16_t t;
     ground();
     play_enter();
-#if defined(_COCO_BASIC_) || defined(__ADAM__) || defined(__MSDOS__)
+#if defined(_COCO_BASIC_) || defined(__ADAM__) || defined(__MSDOS__) || defined(__NABU__)
     if (show & 0x40)
         field_balloon(0, "NICE SHOT. NOW WATCH THIS ONE!", 30);
     if (show & 0x80) {
@@ -238,7 +238,7 @@ void test_check(void)
         if (test_hook[3] & 0x80)
             st[OFF_SKY] = test_hook[3] & 7;
         field_scene(0, 0);
-#if defined(_COCO_BASIC_) || defined(__ADAM__) || defined(__MSDOS__)
+#if defined(_COCO_BASIC_) || defined(__ADAM__) || defined(__MSDOS__) || defined(__NABU__)
     case 8:
         st[OFF_TURN] = 0;
         st[OFF_SKY] = test_hook[3] & 7;

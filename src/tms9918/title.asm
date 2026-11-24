@@ -4,6 +4,8 @@
 
         SECTION code_user
 
+        INCLUDE "vdpio.inc"
+
         PUBLIC  _scr_picture
         EXTERN  _title_pat, _title_col, _lz_unpack, _lz_src, _lz_dst
         EXTERN  _va_addr, _va_src, _va_len, _va_writef
@@ -27,9 +29,9 @@ sp_r:   ld      (hl),$FF
         ld      (_vdp_busy),a
         ld      a,4
         ld      (_vdp_r7),a
-        out     ($BF),a
+        out     (VDP_CTRL),a
         ld      a,$87
-        out     ($BF),a
+        out     (VDP_CTRL),a
         xor     a
         ld      (_vdp_busy),a
         ld      a,(_vdp_pend)
@@ -49,5 +51,9 @@ table:  ld      (_lz_src),hl
         ld      (_va_len),hl
         jp      _va_writef
 
+IFDEF TITLE_BUF                         ; (the platform's build may lend it memory: the
+        defc    big = TITLE_BUF         ; NABU's field store, free until a room)
+ELSE
         SECTION bss_user
 big:    defs    $1800
+ENDIF

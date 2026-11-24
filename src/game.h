@@ -130,7 +130,7 @@ uint16_t entry_len(const uint8_t *e);
 /* menus.c */
 void title(void);
 void name_entry(void);
-uint8_t room_list(void);            /* 1: srv_table picked */
+uint8_t room_list(void);            /* 1: srv_table picked (the NABU: 2, ESC: the name again) */
 
 /* room.c: the waiting room, the shop, the results */
 void wait_enter(void);

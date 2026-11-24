@@ -31,8 +31,7 @@
         EXTERN  _frame_wait, _field_off
         PUBLIC  glyph8, vram8
 
-        defc    VDP_DATA = $BE
-        defc    VDP_CTRL = $BF
+        INCLUDE "vdpio.inc"     ; VDP_DATA, VDP_CTRL (the platform's)
         defc    VR_NAME = $1800
         defc    VR_SAT = $1B00
         defc    VR_NAMEL = $1C00
@@ -281,8 +280,26 @@ glyph8: push    hl
         ret
 
 ; vram8: DE = the 8 bytes at VRAM HL (a buffer's: copy them before the next
-; call) (keeps BC, HL)
-vram8:  push    hl
+; call) (keeps BC, HL). ART_RAM (the platform's build): the art block's are
+; read from its copy in RAM (_art_ram: 3800h-3BFFh as loaded): the NABU's
+; PICO9918 slips a byte on sequential VRAM reads.
+vram8:
+IFDEF ART_RAM
+        EXTERN  _art_ram
+        ld      a,h
+        sub     $38
+        cp      4
+        jr      nc,v8_vram
+        push    hl
+        ld      h,a
+        ld      de,_art_ram
+        add     hl,de
+        ex      de,hl
+        pop     hl
+        ret
+v8_vram:
+ENDIF
+        push    hl
         push    bc
         call    raddr
         ld      de,gbuf

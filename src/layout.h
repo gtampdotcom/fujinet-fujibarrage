@@ -29,7 +29,7 @@
 #define SHOP_CASH_C  20
 #define SHOP_TIMER_C 30
 #define TXT_SHOP_HEAD "ITEM          PRICE BUY  OWN"
-#ifdef __ADAM__                 /* (the Adam: RETURN, and a TAB key) */
+#if defined(__ADAM__) || defined(__NABU__)  /* (the Adam, the NABU: RETURN, and a TAB key) */
 #define TXT_SHOP_HINT "FIRE BUY  LEFT SELL  RETURN DONE"
 #define TXT_W_HOSTSET "S SEATS TAB PAGE <> SET FIRE GO"
 #define TXT_W_SET     "S SEATS  TAB PAGE"
@@ -156,12 +156,15 @@
 
 #if defined(_COCO_BASIC_) || defined(__MSDOS__)
 #define TXT_DEFENCES "SET UP DEFENCES, ENTER: DONE"
-#elif defined(__ADAM__)
+#elif defined(__ADAM__) || defined(__NABU__)
 #define TXT_DEFENCES "SET UP DEFENCES, RETURN DONE"   /* (28: the timer at 29) */
 #elif defined(__ATARI5200__)
 #define TXT_DEFENCES "SET UP DEFENCES, START: DONE"
 #endif
 
+#ifdef __NABU__
+#define QUIT_HINT "ESC: QUIT"           /* the title: ESC resets to the NABU's menu (plat_quit) */
+#endif
 #ifdef __MSDOS__
 #define QUIT_HINT "ESC: LOBBY"          /* the title: ESC goes back to the lobby (menus.c) */
 #endif

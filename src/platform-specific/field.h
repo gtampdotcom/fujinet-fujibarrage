@@ -93,7 +93,7 @@
 #define TXT_ITEMS "I: ITEMS"
 #endif
 
-#ifdef __ADAM__
+#if defined(__ADAM__) || defined(__NABU__)
 /* TMS9918 Graphics II: the field 256x168 (character rows 0-20) over a
  * 3-row HUD; the tanks are sprites (src/tms9918/) */
 #define FIELD_W 256

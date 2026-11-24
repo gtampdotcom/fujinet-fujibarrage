@@ -258,9 +258,19 @@ void shop_state(void)
     scr_text(23, 0, ln);
 }
 
+#ifdef __NABU__
+/* the rows still to draw again after a scroll (0xFF: none): a few a pass, so
+   the loop (and the link) never stops for the whole list (~29 frames) */
+static uint8_t shop_redo = 0xFF;
+#define REDO_ROWS 3
+#endif
+
 static void shop_all(void)
 {
     uint8_t i;
+#ifdef __NABU__
+    shop_redo = 0xFF;                   /* (all of them now) */
+#endif
     for (i = shop_top; i < shop_top + SHOP_ROWS; ++i)
         shop_line(i);
 }
@@ -286,6 +296,15 @@ void shop_enter(void)
 void shop_frame(void)
 {
     uint8_t fresh = inp_dir & ~rep_prev, mv, it, args[2], old = shop_sel;
+#ifdef __NABU__
+    if (shop_redo != 0xFF) {
+        for (mv = 0; mv < REDO_ROWS && shop_redo < shop_top + SHOP_ROWS; ++mv, ++shop_redo)
+            if (shop_redo != shop_sel)  /* (drawn at once) */
+                shop_line(shop_redo);
+        if (shop_redo >= shop_top + SHOP_ROWS)
+            shop_redo = 0xFF;
+    }
+#endif
     if (my_seat >= SEATS || (PL(my_seat, P_FLAGS) & PF_DONE) || !shop_n)
         return;
     mv = rep();
@@ -299,9 +318,17 @@ void shop_frame(void)
             /* a row on: the text moves, the new row is drawn */
             it = shop_sel < shop_top;
             shop_top = it ? shop_sel : shop_sel - SHOP_ROWS + 1;
+#ifdef __NABU__
+            /* every row drawn again, a few a pass (shop_redo): only writes (a
+               scroll reads the VRAM back, ~9K, and the PICO9918 v1.2 slips
+               bytes reading) */
+            shop_line(shop_sel);        /* the one we're on now, the rest after */
+            shop_redo = shop_top;
+#else
             scr_scroll(SHOP_TOP, SHOP_ROWS, !it);
             shop_line(old);
             shop_line(shop_sel);
+#endif
         } else {
             shop_line(old);
             shop_line(shop_sel);

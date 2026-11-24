@@ -31,7 +31,7 @@ static uint8_t stage[STATE_SIZE];
 #ifdef __CC65__
 #pragma bss-name (pop)
 #endif
-#ifdef MENU
+#if defined(MENU) || defined(ONE_PROGRAM)
 uint8_t rooms[MAX_ROOMS][ROOM_REC];
 #endif
 uint8_t net_err, net_heard, net_tv = 0xFF, net_terrain;
@@ -59,7 +59,7 @@ void net_leave(void) {}
 void net_close(void) {}
 #else
 static uint8_t link, joined, seq, credited, resync_hold, resync_owed, held, d_owed, d_sid, d_seg;
-#ifdef MENU
+#if defined(MENU) || defined(ONE_PROGRAM)
 static uint8_t room_n, room_have;
 #endif
 static uint16_t quiet, q_ping;
@@ -197,12 +197,12 @@ static void drop(void)
 static uint8_t frame(uint8_t n)
 {
     uint8_t *p = nst_buf + 1;
-#ifndef MENU
+#if !defined(MENU) || defined(ONE_PROGRAM)
     uint16_t off, x, i;
     uint8_t len;
 #endif
     switch (nst_buf[0]) {
-#ifndef MENU
+#if !defined(MENU) || defined(ONE_PROGRAM)
     case CS_PATCH:
         for (i = 1; i + 3 <= n; i += len) {
             off = LE16A(nst_buf, i);
@@ -220,7 +220,8 @@ static uint8_t frame(uint8_t n)
             return NET_STATE;
         }
         break;
-#else
+#endif
+#if defined(MENU) || defined(ONE_PROGRAM)
     case CS_ROOM:
         if (n >= 3 + ROOM_REC && p[0] < MAX_ROOMS) {
             memcpy(rooms[p[0]], p + 2, ROOM_REC);
@@ -233,7 +234,7 @@ static uint8_t frame(uint8_t n)
     case CS_ERROR:
         net_err = p[0];
         return NET_ERROR;
-#ifndef MENU
+#if !defined(MENU) || defined(ONE_PROGRAM)
     case CS_CATALOG:
 #ifndef CAT_ROM                         /* (ours is in ROM: cat_check compares) */
         off = LE16(p);
@@ -417,7 +418,7 @@ void net_want(uint8_t reason, uint8_t secs)
     send(SC_WANT, w, 2);
 }
 
-#ifdef MENU
+#if defined(MENU) || defined(ONE_PROGRAM)
 /* The room list (blocking): asked again until it comes. */
 uint8_t net_rooms(void)
 {

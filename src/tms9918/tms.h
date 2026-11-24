@@ -2,7 +2,8 @@
  * tms.h -- the TMS9918A as FujiBarrage uses it: Graphics II with an
  * identity name table (each of the 768 cells has its own pattern and
  * colours), 8x8 sprites. Shared by the Adam and, later, the MSX; the
- * platform says how the VDP is reached (src/adam/vdpio.inc, adam.h).
+ * platform says how the VDP is reached (src/adam/vdpio.inc, adam.h; the
+ * NABU's src/nabu/vdpio.inc, nabu.h).
  *
  * VRAM:
  *   0000-17FF  patterns (three thirds of 256 cells, 8 bytes each)
@@ -43,6 +44,9 @@ enum { C_CLEAR, C_BLACK, C_MGREEN, C_LGREEN, C_DBLUE, C_LBLUE, C_DRED, C_CYAN,
 
 #ifdef __ADAM__
 #include "adam.h"
+#endif
+#ifdef __NABU__
+#include "nabu.h"
 #endif
 
 /* vdp.asm: the arguments are these variables */

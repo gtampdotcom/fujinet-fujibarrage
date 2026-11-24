@@ -46,6 +46,11 @@
         EXTERN  _vdp_r7, _vdp_busy, _vdp_pend, _vdp_catch_up, _gfx_fast, _shake_dx, _flash_n
 
         INCLUDE "tms9918/style.inc"
+        PUBLIC  _ao_lim
+        defc    _ao_lim = ao_lim + 1
+IFDEF F18A_HOOK
+        EXTERN  _f18a, _f18a_look, _f18a_off, _f18a_fire
+ENDIF
         defc    FIELD_H = 168
         defc    HUD_ROW = 21
         defc    CF_DIRTY = 1
@@ -63,8 +68,7 @@
         defc    TD_SIZE = 6             ; td: x (2), y, angle, on, me
         defc    OV_SIZE = 12            ; ovl: x (2), y, colour, its pattern's 8 rows
         defc    LMAX = 30               ; the balloon's line
-        defc    VDP_DATA = $BE
-        defc    VDP_CTRL = $BF
+        INCLUDE "vdpio.inc"     ; VDP_DATA, VDP_CTRL (the platform's)
 
 ; ---- the round's look ---------------------------------------------------------
 
@@ -308,7 +312,16 @@ _field_open:
         ld      a,1
         call    blank
 fo_bl:  pop     bc
+IFDEF F18A_HOOK
+        push    bc
         call    styles
+        pop     hl              ; (L sky, H pal: f18a_look(sky, pal), as zsdcc pushes them)
+        push    hl
+        call    _f18a_look      ; (an F18A: the VGA build's look, src/nabu/f18a.c)
+        pop     hl
+ELSE
+        call    styles
+ENDIF
         ld      a,C_BLACK
         ld      (_vdp_r7),a
         ld      h,a
@@ -352,7 +365,11 @@ _field_off:
         ld      (_fld_live),a
         ld      (b_on),a
         ld      (ovl_n),a
+IFDEF F18A_HOOK
+        jp      _f18a_off
+ELSE
         ret
+ENDIF
 
 ; void field_column(uint16_t x, const uint8_t *entry)
 _field_column:
@@ -881,7 +898,7 @@ ao_m:   cp      (hl)
         ld      a,(hl)
 ao_m1:  inc     hl
         djnz    ao_m
-        cp      4
+ao_lim: cp      4               ; (the VDP's four a line: an F18A's more, ao_lim)
         jr      nc,ao_ovl
         ld      hl,(al_l)
         ld      b,8
@@ -1630,6 +1647,11 @@ fire_step:
         ld      (hl),0
         ld      hl,_fire_ph
         inc     (hl)
+IFDEF F18A_HOOK
+        ld      a,(_f18a)       ; (an F18A: the copper cycles them)
+        or      a
+        jp      nz,_f18a_fire
+ENDIF
         ld      hl,_fld_dirty
         ld      c,FROWS
 fs_r:   ld      b,32
