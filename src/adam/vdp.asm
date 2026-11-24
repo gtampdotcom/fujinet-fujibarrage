@@ -10,8 +10,7 @@
         PUBLIC  _va_write, _va_writef, _va_fill, _va_read
         EXTERN  _vdp_busy, _vdp_pend, _vdp_catch_up
 
-        defc    VDP_DATA = $BE
-        defc    VDP_CTRL = $BF
+        INCLUDE "vdpio.inc"     ; VDP_DATA, VDP_CTRL (the platform's)
 
 ; lock; the address va_addr (A's bit 6 set: a write); DE the count, HL the source
 setup:

@@ -3,7 +3,8 @@
 ; The CoCo's src/coco2/fld2.asm in Z80, its ellipse the same steps, so the
 ; same pixels (tools/adamsim/refcheck.py).
 ;
-; The store (A700h-D0FFh, under the stack) is the field as two planes of a bit a pixel, laid out as the
+; The store (SHADOW_ORG, 2A00h bytes: the Adam's A700h-D0FFh, under the
+; stack; the NABU's D000h-F9FFh) is the field as two planes of a bit a pixel, laid out as the
 ; VDP's pattern table: D (dirt) and F (fire, the value 3), 256 x 168.
 ; Character row r (lines 8r..8r+7) is two pages: D at SH_HI + 2r, F the
 ; page after; in a page, the byte for pixels x..x+7 (x a multiple of 8) of
@@ -31,8 +32,11 @@
         PUBLIC  fld_w, fld_h, fld_mid, fld_espan
         PUBLIC  _fld_shadow
 
-        defc    _fld_shadow = $A700     ; (tools/adam/mkimage.py's SHADOW_ORG)
-        defc    SH_HI   = $A7
+IFNDEF SHADOW_ORG                       ; (a page: the platform's build may say, -DSHADOW_ORG)
+        defc    SHADOW_ORG = $A700      ; (tools/adam/mkimage.py's SHADOW_ORG)
+ENDIF
+        defc    _fld_shadow = SHADOW_ORG
+        defc    SH_HI   = SHADOW_ORG / 256
         defc    FLINES  = 168
         defc    FROWS   = 21
         defc    PX_SKY  = 1

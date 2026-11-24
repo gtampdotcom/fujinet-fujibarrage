@@ -25,7 +25,7 @@ uint8_t plat_hz(void);          /* 50 or 60: the display's frames a second */
 void frame_tick(void);
 uint8_t vbi_now(void);
 #define vbi_count (vbi_now())
-#elif defined(_COCO_BASIC_) || defined(__ADAM__) || defined(__MSDOS__)
+#elif defined(_COCO_BASIC_) || defined(__ADAM__) || defined(__MSDOS__) || defined(__NABU__)
 /* The CoCo counts frames in its interrupt. Asking is also where the CoCo
  * 1/2 (no timer) plays a slice of sound while a script waits, where the
  * Adam draws the field's changed cells (src/tms9918/render.asm), and where

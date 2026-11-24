@@ -28,12 +28,17 @@
         PUBLIC  _fire_ph, _rc_pat, _rc_col, _rc_cell, _rc_y
         EXTERN  _fld_dirty, _fld_rowd, _fld_nd, _fld_shadow, _st_starb
         EXTERN  _vdp_busy, _vdp_pend, _vdp_catch_up, _tms_blanked, _ovl_cell
+IFDEF F18A_HOOK
+        EXTERN  _st_grain
+ENDIF
 
-        defc    SH_HI   = $A7
+IFNDEF SHADOW_ORG
+        defc    SHADOW_ORG = $A700      ; (fld.asm's)
+ENDIF
+        defc    SH_HI   = SHADOW_ORG / 256
         INCLUDE "tms9918/style.inc"
         defc    FROWS   = 21
-        defc    VDP_DATA = $BE
-        defc    VDP_CTRL = $BF
+        INCLUDE "vdpio.inc"     ; VDP_DATA, VDP_CTRL (the platform's)
 
 ; bits set in a nibble
 pop4:   defb    0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4
@@ -179,7 +184,7 @@ cl_run: ld      d,(hl)          ; D
         ld      (ix+0),d        ; sky and dirt: D, dirt on sky
         ld      a,(iy+L_MIXC)
         ld      (ix+8),a
-        jr      cl_next
+        jp      cl_next
 cl_sky: ld      a,(_st_stars)
         or      a
         jr      nz,cl_star
@@ -204,6 +209,20 @@ cl_star:
         jr      cl_skyc
 cl_dirt:
         ld      a,(iy+L_DIRTP)
+IFDEF F18A_HOOK
+        or      a               ; (an F18A's grain: the line's seed and the column's)
+        jr      z,cl_dg
+        push    hl
+        ld      hl,rc_c37
+        add     a,(hl)
+        ld      e,a
+        ld      d,0
+        ld      hl,_st_grain
+        add     hl,de
+        ld      a,(hl)
+        pop     hl
+cl_dg:
+ENDIF
         ld      (ix+0),a
         ld      a,(iy+L_DIRTC)
         ld      (ix+8),a

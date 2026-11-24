@@ -1,0 +1,420 @@
+; nabu_hw.asm -- the NABU's keyboard and HCCA (FujiBlast's src/nabu/nabu_hw.asm;
+; the VDP's handler is irq.asm).
+; C calls answer in L (H = 0), as src/msx/msxbios.asm's.
+
+        SECTION code_user
+
+; ---- the keyboard -----------------------------------------------------------
+; Our own keyboard interrupt handler instead of z88dk's (which keeps ONE key and
+; parses joystick messages itself): every code the keyboard sends (keys, key-ups,
+; joystick prefixes 80h-83h and joystick bytes A0h-BFh) goes into a 16-code queue
+; that input.c reads. The keyboard's 8251 holds only about two codes (~2.8 ms):
+; while interrupts are off (an HCCA transaction) codes are taken by polling it
+; (kb_poll, from hcca_rx_n's wait loops and nstrans.c's drain), so none is lost.
+        PUBLIC  _kb_install, _kb_get, _kb_poll
+
+_kb_install:                            ; the IM 2 table's keyboard entry (z88dk's: I * 256 + 4)
+        di
+        ld      a,i
+        ld      h,a
+        ld      l,4
+        ld      de,kb_isr
+        ld      (hl),e
+        inc     hl
+        ld      (hl),d
+        ei
+        ret
+
+kb_isr:                                 ; (short: the HCCA's receive interrupt can't wait long)
+        push    af
+        push    de
+        push    hl
+        call    kb_take
+        pop     hl
+        pop     de
+        pop     af
+        ei
+        ret
+
+; void kb_poll(void): with interrupts off, take a code if one waits (keeps BC, DE, HL)
+_kb_poll:
+        in      a,($91)                 ; the keyboard 8251's status: bit 1 = a code waits
+        and     2
+        ret     z
+        push    de
+        push    hl
+        call    kb_take
+        pop     hl
+        pop     de
+        ret
+
+; read the 8251's code into the queue (dropped if full); changes AF, DE, HL
+kb_take:
+        in      a,($90)
+kb_store:                               ; (the code in A)
+        ld      d,a
+        ld      a,(_kbq_w)
+        ld      e,a
+        inc     a
+        and     15
+        ld      hl,_kbq_r
+        cp      (hl)
+        ret     z                       ; full
+        ld      (_kbq_w),a
+        ld      hl,_kbq
+        ld      a,e
+        add     a,l
+        ld      l,a
+        adc     a,h
+        sub     l
+        ld      h,a
+        ld      (hl),d
+        ret
+
+; uint8_t kb_get(void): the next code, 0 if none (the handler only writes kbq_w)
+_kb_get:
+        ld      a,(_kbq_r)
+        ld      hl,_kbq_w
+        cp      (hl)
+        jr      z,kbg_none
+        ld      e,a
+        inc     a
+        and     15
+        ld      (_kbq_r),a
+        ld      hl,_kbq
+        ld      d,0
+        add     hl,de
+        ld      l,(hl)
+        ld      h,0
+        ret
+kbg_none:
+        ld      hl,0
+        ret
+
+; z88dk's console (fputc_cons) is linked to this instead (build-nabu.bat: -pragma-redirect), so
+; its driver and font stay out: the game draws its own text.
+        PUBLIC  _fputc_cons_stub
+_fputc_cons_stub:
+        ret
+
+; uint8_t hcca_rx_n(void): read an HCCA reply into hcca_dst, in ONE call: a
+; byte comes every ~320 T-states and C glue between two reads can take as long
+; (a byte not read before the next lands is lost). The receive mask (80h) is set
+; once and port B read in a tight loop, as NABU-LIB's "Di" routines do.
+;   hcca_pre = 0: hcca_cnt bytes.
+;   hcca_pre = 1 or 4: that many prefix bytes first (into hcca_hdr; hcca_npre
+;   says how many came), then a payload whose length is the prefix's first
+;   byte (pre 4: only if the other three are 0, else none), at most hcca_cnt.
+; hcca_tmo1 polls (~97 T-states each, with the keyboard and hush looks) wait for the first byte, hcca_tmoN for
+; each next. Returns the payload bytes read in A and L (H = 0).
+; A reply that keeps us waiting (interrupts are off, so the music can't play on): after
+; ~45 ms the AY's three volumes go to 0, so no note hangs; ay.asm puts the
+; sound back on the next frame (snd_hushed).
+        PUBLIC  _hcca_rx_n, _snd_hush
+        EXTERN  _hcca_dst, _hcca_cnt, _hcca_tmo1, _hcca_tmoN, _hcca_left
+        EXTERN  _hcca_pre, _hcca_npre, _hcca_want, _hcca_hdr, _snd_hushed
+
+rx_slow:                                ; every 256 polls without a byte (keeps BC, DE, HL)
+        push    hl
+        ld      hl,rx_slowc
+        inc     (hl)
+        ld      a,(hl)
+        cp      8                       ; 8 x 256 polls (~97 T-states each): ~45 ms
+        call    z,_snd_hush
+        ld      a,15                    ; back to port B, which the loop polls
+        out     ($41),a
+        pop     hl
+        ret
+
+; void snd_hush(void): the AY's three volumes to 0 (once), snd_hushed set: ay.asm's
+; next frame puts the sound back. Also from C (nstrans.c's drain, plat_init). Changes
+; A, L; leaves the latch at 14; call it with interrupts off or before they matter.
+_snd_hush:
+        ld      a,(_snd_hushed)
+        or      a
+        ret     nz
+        inc     a
+        ld      (_snd_hushed),a
+        ld      l,8
+rs_vol:
+        ld      a,l
+        out     ($41),a
+        xor     a
+        out     ($40),a
+        inc     l
+        ld      a,l
+        cp      11
+        jr      nz,rs_vol
+        ld      a,14
+        out     ($41),a
+        ret
+
+_hcca_rx_n:
+        xor     a
+        ld      (rx_slowc),a
+        ld      a,14
+        out     ($41),a
+        ld      a,$80
+        out     ($40),a
+        ld      a,15
+        out     ($41),a                 ; latch left at port B: we poll it
+        xor     a
+        ld      (_hcca_npre),a
+        ld      a,(_hcca_pre)
+        or      a
+        jr      z,rxn_plain
+        ; ---- the prefix
+        ld      d,a
+        ld      hl,_hcca_hdr
+        ld      bc,(_hcca_tmo1)
+        ld      e,1
+rxn_p1poll:
+        in      a,($40)
+        and     1
+        jr      nz,rxn_p1got
+        in      a,($91)                 ; a keyboard code waiting? (interrupts are off)
+        and     2
+        call    nz,_kb_poll
+        dec     bc
+        ld      a,c
+        or      a
+        call    z,rx_slow
+        ld      a,b
+        or      c
+        jr      nz,rxn_p1poll
+        jp      rxn_none                ; timed out: npre says how far (jp: out of jr's reach)
+rxn_p1got:
+        dec     e
+        jr      nz,rxn_p1ns
+        ld      (_hcca_left),bc         ; polls left: how long the reply took
+rxn_p1ns:
+        in      a,($80)
+        ld      (hl),a
+        inc     hl
+        ld      a,(_hcca_npre)
+        inc     a
+        ld      (_hcca_npre),a
+        dec     d
+        jr      z,rxn_p1end
+        ld      bc,(_hcca_tmoN)
+        jr      rxn_p1poll
+rxn_p1end:
+        ld      a,(_hcca_pre)
+        cp      1
+        jr      z,rxn_cnt
+        ld      a,(_hcca_hdr+1)         ; an int32: 0 .. 255 only
+        ld      hl,_hcca_hdr+2
+        or      (hl)
+        inc     hl
+        or      (hl)
+        jr      nz,rxn_none
+rxn_cnt:
+        ld      a,(_hcca_hdr)
+        ld      b,a
+        ld      a,(_hcca_cnt)
+        cp      b
+        jr      c,rxn_have              ; room for fewer: that many
+        ld      a,b
+rxn_have:
+        ld      (_hcca_want),a
+        ld      d,a
+        or      a
+        jr      z,rxn_none
+        ld      bc,(_hcca_tmoN)
+        ld      e,0                     ; (the left-over is not stored again)
+        jr      rxn_start
+        ; ---- no prefix
+rxn_plain:
+        ld      a,(_hcca_cnt)
+        ld      (_hcca_want),a
+        ld      d,a
+        or      a
+        jr      z,rxn_none
+        ld      bc,(_hcca_tmo1)
+        ld      e,1
+rxn_start:
+        ld      hl,(_hcca_dst)
+rxn_poll:
+        in      a,($40)
+        and     1
+        jr      nz,rxn_got
+        in      a,($91)                 ; a keyboard code waiting? (interrupts are off)
+        and     2
+        call    nz,_kb_poll
+        dec     bc
+        ld      a,c
+        or      a
+        call    z,rx_slow
+        ld      a,b
+        or      c
+        jr      nz,rxn_poll
+        jr      rxn_done                ; timed out
+rxn_got:
+        dec     e
+        jr      nz,rxn_nostore
+        ld      (_hcca_left),bc
+rxn_nostore:
+        in      a,($80)
+        ld      (hl),a
+        inc     hl
+        dec     d
+        jr      z,rxn_done
+        ld      bc,(_hcca_tmoN)
+        jr      rxn_poll
+rxn_done:
+        ld      a,(_hcca_want)
+        sub     d                       ; got = wanted - still to come
+        ld      l,a
+        ld      h,0
+        ret
+rxn_none:
+        xor     a
+        ld      l,a
+        ld      h,a
+        ret
+
+        SECTION bss_user
+_kbq:           defs    16
+_kbq_r:         defs    1
+_kbq_w:         defs    1
+rx_slowc:       defs    1
+
+
+; uint16_t nabu_fletcher(const uint8_t *p, uint8_t n): nstrans.c's frame sum,
+; both sums mod 255 (a carry out of a byte is 256 = 1, mod 255; 255 is 0).
+; L = s1, H = s2. zsdcc's arguments on the stack.
+        SECTION code_user
+        PUBLIC  _nabu_fletcher
+_nabu_fletcher:
+        ld      hl,2
+        add     hl,sp
+        ld      e,(hl)
+        inc     hl
+        ld      d,(hl)                  ; DE = p
+        inc     hl
+        ld      b,(hl)                  ; B = n
+        ld      c,0                     ; s1
+        ld      l,c                     ; s2
+        ld      a,b
+        or      a
+        jr      z,fl_done
+fl_loop:
+        ld      a,(de)
+        add     a,c
+        adc     a,0
+        cp      255
+        jr      nz,fl_s1
+        xor     a
+fl_s1:  ld      c,a
+        add     a,l
+        adc     a,0
+        cp      255
+        jr      nz,fl_s2
+        xor     a
+fl_s2:  ld      l,a
+        inc     de
+        djnz    fl_loop
+fl_done:
+        ld      h,l
+        ld      l,c
+        ret
+
+
+; ---- the HCCA's replies by interrupt ---------------------------------------------
+; nstrans.c doesn't wait for a reply: the HCCA receive interrupt (the IM 2 table's
+; entry 0) puts each byte into a 256-byte ring (rxq, rxq_w; nstrans.c reads it).
+; Nothing in the port may hold interrupts off longer than about one byte's time
+; (~320 T-states) while a reply can come, or the UART loses one.
+        SECTION code_user
+        PUBLIC  _hcca_rx_install, _hcca_send, _rxq, _rxq_w
+        EXTERN  _int_mask
+
+_hcca_rx_install:
+        di
+        ld      a,i
+        ld      h,a
+        ld      l,0
+        ld      de,hcca_rx_isr
+        ld      (hl),e
+        inc     hl
+        ld      (hl),d
+        ei
+        ret
+
+hcca_rx_isr:
+        push    af
+        push    hl
+        call    rx_take
+        pop     hl
+        pop     af
+        ei
+        ret
+
+; the waiting byte into the ring; changes A, HL
+rx_take:
+        ld      hl,_rxq_w
+        ld      a,(hl)
+        inc     (hl)
+        ld      hl,_rxq
+        add     a,l
+        ld      l,a
+        jr      nc,rt_in
+        inc     h
+rt_in:  in      a,($80)
+        ld      (hl),a
+        ret
+
+; void hcca_send(const uint8_t *p, uint8_t n): n bytes out. Interrupts are off only
+; for each look at the transmitter (and the byte, if it is free): ~120 T-states. In
+; between they are on, so the receive interrupt takes every byte of a reply that
+; comes meanwhile (a request sent just before can be answered while this one goes).
+; (Polling the receiver here, interrupts off throughout, lost bytes in MAME.)
+_hcca_send:
+        ld      hl,2
+        add     hl,sp
+        ld      e,(hl)
+        inc     hl
+        ld      d,(hl)
+        inc     hl
+        ld      b,(hl)                  ; DE = p, B = n
+        ld      a,b
+        or      a
+        ret     z
+hs_byte:
+        ld      c,0                     ; 256 looks at most (~10 ms), then it goes anyway
+hs_try:
+        di
+        ld      a,14
+        out     ($41),a
+        ld      a,$40                   ; the send mask: port B bit 0 = the transmitter is free
+        out     ($40),a
+        ld      a,15
+        out     ($41),a
+        in      a,($40)
+        and     1
+        jr      z,hs_busy
+hs_out:
+        ld      a,(de)
+        out     ($80),a
+        call    hs_mask
+        ei
+        inc     de
+        djnz    hs_byte
+        ret
+hs_busy:
+        call    hs_mask
+        ei
+        dec     c
+        jr      nz,hs_try
+        di
+        jr      hs_out
+hs_mask:                                ; the mask back (the receive interrupt is in it)
+        ld      a,14
+        out     ($41),a
+        ld      a,(_int_mask)
+        out     ($40),a
+        ret
+
+        SECTION bss_user
+_rxq:           defs    256
+_rxq_w:         defs    1

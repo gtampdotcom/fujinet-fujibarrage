@@ -19,7 +19,7 @@
         PUBLIC  _flash_n, _shake_n, _shake_dx, _nmi_pal, _vdp_r1, _vdp_r7, _vdp_r2
         EXTERN  _snd_nmi
 
-        defc    VDP_CTRL = $BF
+        INCLUDE "vdpio.inc"     ; VDP_DATA, VDP_CTRL (the platform's)
 
 _z80_nmi:
         push    af

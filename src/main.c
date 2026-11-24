@@ -10,6 +10,9 @@
  *       the room clears it from the appkeys and boots the disk again.
  *   MENU.COM (-DMENU)       the title, the name, the room list: it writes
  *       the choice to the appkeys and boots the disk again.
+ *
+ * Or one program (-DONE_PROGRAM: the NABU, which has room for both and no
+ * disk to boot again): the menu, then the room, then the menu.
  */
 #include <string.h>
 #include "game.h"
@@ -23,7 +26,7 @@
 
 enum { S_NONE, S_WAIT, S_SHOP, S_FIELD, S_RESULTS, S_OVER };
 
-#ifndef MENU
+#if !defined(MENU) || defined(ONE_PROGRAM)
 static uint8_t screen_for(void)
 {
     switch (st[OFF_PHASE]) {
@@ -144,6 +147,38 @@ static uint8_t play_room(void)
 
 void test_check(void);
 uint8_t xload(void);
+#endif
+
+#ifdef ONE_PROGRAM
+
+int main(void)
+{
+    plat_init();
+    test_check();
+    appkey_load();
+    title();
+    if (!my_name[0]) {
+        name_entry();
+        appkey_save_name();
+    }
+    for (;;) {
+        uint8_t r = room_list();
+        if (r == 2) {                   /* ESC (the NABU): the name again, its ESC the title */
+            name_entry();
+            appkey_save_name();
+        } else if (r) {
+            net_close();
+            appkey_save_room();
+            field_init();
+            while (play_room())         /* (the link dropped: again) */
+                ;
+            message("BACK TO THE ROOMS", "", 1);
+            appkey_clear_room();
+        }
+    }
+}
+
+#elif !defined(MENU)
 
 int main(void)
 {
